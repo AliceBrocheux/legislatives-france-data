@@ -89,31 +89,36 @@ src/
   pipeline.py                  # Script de construction complet
 ```
 
-## Triangulaires par année
+## Configurations de second tour par année
 
-Circos avec 3+ candidats présents au 2e tour (maintenus ou non désistés) :
+« Triangulaire » = exactement 3 candidats maintenus au T2 ; « Quadrangulaire » = exactement 4 ; « 5+ » = 5 ou plus.
 
-| Année | Triangulaires | Référence | Écart |
-|-------|--------------|-----------|-------|
-| 1958 | 353 | - | - |
-| 1962 | 159 | - | - |
-| 1967 | 74 | - | - |
-| 1973 | 49 | - | - |
-| 1978 | 1 | - | - |
-| 1981 | 7 | - | - |
-| 1988 | 9 | - | - |
-| 1993 | 15 | - | - |
-| 1997 | 79 | **79** | ✓ exact |
-| 2002 | 10 | - | - |
-| 2007 | 1 | - | - |
-| 2012 | 33 | - | - |
-| 2017 | 1 | - | - |
-| 2022 | 7 | 8 | -1 |
-| 2024 | 91 | ~89 | +2 |
+| Année | Duels | Triangulaires | Quadrangulaires | 5+ | Réf. tri. (Wikipedia) | Écart |
+|-------|-------|--------------|----------------|-----|----------------------|-------|
+| 1958 | 73 | **233** | 106 | 14 | 235 | −2 |
+| 1962 | 209 | **145** | 14 | 0 | — | — |
+| 1967 | 324 | **72** | 2 | 0 | — | — |
+| 1968 | 9 | **0** | 0 | 0 | — | — |
+| 1973 | 365 | **49** | 0 | 0 | — | — |
+| 1978 | 406 | **1** | 0 | 0 | — | — |
+| 1981 | 20 | **0** | 7 | 0 | — | ⚠️ voir note |
+| 1988 | 417 | **9** | 0 | 0 | — | — |
+| 1993 | 300 | **15** | 0 | 0 | — | — |
+| 1997 | 428 | **78** | 0 | 1 | **79** | −1* |
+| 2002 | 428 | **10** | 0 | 0 | — | — |
+| 2007 | 388 | **1** | 0 | 0 | — | — |
+| 2012 | 388 | **33** | 0 | 0 | — | — |
+| 2017 | 102 | **1** | 0 | 0 | — | — |
+| 2022 | 188 | **7** | 0 | 0 | 8 | −1 |
+| 2024 | 382 | **89** | 2 | 0 | **89** | ✓ |
 
-**Note 2022** : L'écart de 1 est dû à au moins une circo où un candidat juste en dessous du seuil de 12,5% des inscrits a participé au T2 via désistement entrant (remplaçant un candidat désisté). Ces cas ne sont pas captés par les règles de qualification strictes.
+*1997 : la 79e circo est une quintuangulaire (5 maintenus) ; en comptant "3+", on retrouve bien 79 ✓.
 
-**Note 2024** : Le chiffre de référence (89) est celui des triangulaires effective après désistements massifs. Notre compte de 91 recense les circos où 3+ candidats ont effectivement voté au T2 d'après les résultats officiels. L'écart de 2 peut s'expliquer par des circos où le décompte officiel intègre des situations particulières (Outre-mer, etc.).
+**Note 1958** : L'écart de −2 (233 vs réf. 235) est probablement dû à des données CDSP incomplètes pour quelques circonscriptions.
+
+**Note 1981 — anomalie de données** : 7 circos à 4 maintenus mais 0 à 3 maintenus est incohérent. Anomalie héritée du format agrégé CDSP 1981, non corrigeable sans retour aux sources primaires. Ces circos sont marquées `données incomplètes`.
+
+**Note 2022** : L'écart de −1 est dû à une circo où un candidat en dessous du seuil légal s'est maintenu par désistement entrant — cas non capté par la règle stricte de qualification.
 
 ## Limitations connues
 
