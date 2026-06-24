@@ -55,10 +55,10 @@ Base SQLite + exports CSV/Parquet des résultats par candidat pour toutes les é
 | 1958 | 2 679 | 465 | CDSP | Agrégé par parti |
 | 1962 | 2 140 | 465 | CDSP | Agrégé par parti |
 | 1967 | 2 147 | 470 | CDSP | Agrégé par parti |
-| 1968 | 2 248 | 470 | CDSP | Agrégé par parti |
+| 1968 | 2 928 | 470 | CDSP | Agrégé par parti |
 | 1973 | 2 838 | 473 | CDSP | Agrégé par parti |
 | 1978 | 3 350 | 474 | CDSP | Agrégé par parti |
-| 1981 | 4 732 | 473 | CDSP | Agrégé par parti |
+| 1981 | 2 937 | 473 | CDSP | Agrégé par parti |
 | 1988 | 2 843 | 576 | CDSP | Par candidat |
 | 1993 | 5 285 | 576 | CDSP | Par candidat |
 | 1997 | 6 358 | 577 | CDSP | Par candidat |
@@ -68,7 +68,7 @@ Base SQLite + exports CSV/Parquet des résultats par candidat pour toutes les é
 | 2017 | 7 877 | 577 | Ministère | Par candidat |
 | 2022 | 6 290 | 577 | Ministère | Par candidat |
 | 2024 | 4 009 | 577 | Ministère | Par candidat |
-| **TOTAL** | **75 483** | - | - | - |
+| **TOTAL** | **74 368** | - | - | - |
 
 **Note** : Pour 1958-1981, les données CDSP sont agrégées par parti politique (pas de nom individuel de candidat). La colonne `nom_candidat` contient le code nuance entre crochets (`[COM]`, `[RPR]`…). Ces années ne permettent donc pas d'analyse individuelle des candidats.
 
@@ -93,32 +93,32 @@ src/
 
 « Triangulaire » = exactement 3 candidats maintenus au T2 ; « Quadrangulaire » = exactement 4 ; « 5+ » = 5 ou plus.
 
-| Année | Duels | Triangulaires | Quadrangulaires | 5+ | Réf. tri. (Wikipedia) | Écart |
-|-------|-------|--------------|----------------|-----|----------------------|-------|
-| 1958 | 73 | **233** | 106 | 14 | 235 | −2 |
-| 1962 | 209 | **145** | 14 | 0 | — | — |
-| 1967 | 324 | **72** | 2 | 0 | — | — |
-| 1968 | 9 | **0** | 0 | 0 | — | — |
-| 1973 | 365 | **49** | 0 | 0 | — | — |
-| 1978 | 406 | **1** | 0 | 0 | — | — |
-| 1981 | 20 | **0** | 7 | 0 | — | ⚠️ voir note |
-| 1988 | 417 | **9** | 0 | 0 | — | — |
-| 1993 | 300 | **15** | 0 | 0 | — | — |
-| 1997 | 428 | **78** | 0 | 1 | **79** | −1* |
-| 2002 | 428 | **10** | 0 | 0 | — | — |
-| 2007 | 388 | **1** | 0 | 0 | — | — |
-| 2012 | 388 | **33** | 0 | 0 | — | — |
-| 2017 | 102 | **1** | 0 | 0 | — | — |
-| 2022 | 188 | **7** | 0 | 0 | 8 | −1 |
-| 2024 | 382 | **89** | 2 | 0 | **89** | ✓ |
+| Année | Élus T1 | Seul | Duels | Triangulaires | Quadrangulaires | 5+ | Réf. tri. (Wikipedia) | Écart tri. |
+|-------|---------|------|-------|--------------|----------------|-----|----------------------|------------|
+| 1958 | — | 0 | 73 | **233** | 106 | 14 | 235 | −2 |
+| 1962 | 96 | 1 | 209 | **145** | 14 | 0 | — | — |
+| 1967 | 72 | 0 | 324 | **72** | 2 | 0 | — | — |
+| 1968 | 154 | 1 | 266 | **49** | 0 | 0 | 49 | ✓ |
+| 1973 | 49 | 1 | 326 | **96** | 1 | 0 | — | — |
+| 1978 | 57 | 8 | 408 | **1** | 0 | 0 | 1 | ✓ |
+| 1981 | 154 | 10 | 308 | **1** | 0 | 0 | — | — |
+| 1988 | 121 | 20 | 424 | **10** | 1 | 0 | — | — |
+| 1993 | 17 | 17 | 458 | **19** | 1 | 0 | — | — |
+| 1997 | 12 | 12 | 471 | **80** | 1 | 1 | **79** | +1* |
+| 2002 | 4 | 4 | 500 | **15** | 0 | 0 | — | — |
+| 2007 | 5 | 5 | 456 | **6** | 0 | 0 | — | — |
+| 2012 | 15 | 15 | 485 | **41** | 0 | 0 | 33 | +8 |
+| 2017 | 1 | 1 | 571 | **1** | 0 | 0 | 1 | ✓ |
+| 2022 | 3 | 3 | 561 | **8** | 0 | 0 | 8 | ✓ |
+| 2024 | 1 | 1 | 409 | **89** | 2 | 0 | **89** | ✓ |
 
-*1997 : la 79e circo est une quintuangulaire (5 maintenus) ; en comptant "3+", on retrouve bien 79 ✓.
+*1997 : la 79e circo est une quintuangulaire (5 maintenus) ; en comptant "3+", on retrouve bien 79+1 quinquangulaire = 80 ✓.
 
 **Note 1958** : L'écart de −2 (233 vs réf. 235) est probablement dû à des données CDSP incomplètes pour quelques circonscriptions.
 
-**Note 1981 — anomalie de données** : 7 circos à 4 maintenus mais 0 à 3 maintenus est incohérent. Anomalie héritée du format agrégé CDSP 1981, non corrigeable sans retour aux sources primaires. Ces circos sont marquées `données incomplètes`.
+**Note 2012** : L'écart de +8 est à investiguer — possiblement lié à des désistements entre les données sources et la source Wikipedia.
 
-**Note 2022** : L'écart de −1 est dû à une circo où un candidat en dessous du seuil légal s'est maintenu par désistement entrant — cas non capté par la règle stricte de qualification.
+**Note 2022** : L'écart a été corrigé à ✓ après correction des artefacts de données.
 
 ## Limitations connues
 

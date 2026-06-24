@@ -58,6 +58,22 @@ def calculer_qualifie(voix_t1, inscrits_t1, exprimes_t1, annee):
 
 # ─── Parsers CDSP (1958-2012) ─────────────────────────────────────────────────
 
+def _normalize_code(val, width=2):
+    """Normalise un code département ou circonscription en chaîne zero-paddée.
+    Gère les artefacts float pandas ('1.0' → '01', '12.0' → '12')."""
+    s = str(val).strip()
+    if s in ('nan', 'None', ''):
+        return s
+    # Artefact float : '1.0', '12.0' etc.
+    try:
+        f = float(s)
+        if f == int(f):
+            return str(int(f)).zfill(width)
+    except ValueError:
+        pass
+    return s.zfill(width) if s.isdigit() else s
+
+
 CDSP_EARLY_YEARS = {1958, 1962, 1967, 1968}  # données agrégées par parti
 
 def detect_cdsp_format(df_raw):
@@ -114,9 +130,9 @@ def parse_cdsp_candidats(df_t1_raw, df_t2_raw, annee):
         rows = []
 
         for _, row in df_raw.iterrows():
-            dept_code = str(row.iloc[0]).zfill(2)
+            dept_code = _normalize_code(row.iloc[0], 2)
             departement = str(row.iloc[1])
-            circo = str(row.iloc[2]).zfill(2)
+            circo = _normalize_code(row.iloc[2], 2)
             id_circo = f"{dept_code}-{circo}"
 
             # Meta
@@ -202,9 +218,9 @@ def parse_cdsp_partis(df_t1_raw, df_t2_raw, annee):
 
         rows = []
         for _, row in df_raw.iloc[1:].iterrows():
-            dept_code = str(row.iloc[0]).zfill(2)
+            dept_code = _normalize_code(row.iloc[0], 2)
             departement = str(row.iloc[1])
-            circo = str(row.iloc[2]).zfill(2)
+            circo = _normalize_code(row.iloc[2], 2)
             id_circo = f"{dept_code}-{circo}"
 
             inscrits = _to_int(row.iloc[3])
@@ -930,37 +946,100 @@ def run_pipeline():
 
 def parse_cdsp_partis_v2(df_t1_raw, df_t2_raw, annee):
     """
-    Parse format parti CDSP (1958-1968).
-    La ligne 1 contient les codes nuances.
+    Parse format parti CDSP (1958-1981). Données agrégées par parti, pas par candidat.
+
+    Formats détectés :
+    - 1958-1978 : 2 lignes de header (long names + codes), T2 contient colonne 'élu premier tour'
+    - 1981 : 1 ligne de header (codes directs), T2 ne liste que les circos en ballottage
     """
+    # Correspondance codes T2 → codes T1 quand ils diffèrent (cas 1968 principalement)
+    T2_TO_T1_CODE = {
+        1968: {'PC': 'COM', 'UDR-RI': 'UDR', 'DIVMAJ': 'DIVGAULL', 'DVD': 'DIVGAULL'},
+    }
+
+    def detect_header_rows(df_raw):
+        """Retourne (nb_header_rows, has_elu_col, data_start_col_offset).
+        1981 T2 : 1 seule ligne de header, pas de colonne élu.
+        1958-1978 : 2 lignes de header, colonne élu premier tour en T2."""
+        headers = list(df_raw.columns)
+        # Si la première colonne ressemble à un code ou un numéro → 1 header row (1981)
+        first_col = str(headers[0]).lower()
+        if 'code' not in first_col and 'département' not in first_col and 'dep' not in first_col:
+            return 1, False
+        # Cherche colonne élu premier tour dans les headers
+        has_elu = any('lu' in str(h).lower() and 'tour' in str(h).lower() for h in headers)
+        return 2, has_elu
+
     def parse_round(df_raw, is_t2=False):
         if df_raw is None:
             return pd.DataFrame()
 
-        # Row 0 = noms longs des partis (header)
-        # Row 1 = codes nuances
-        headers = list(df_raw.columns)  # noms longs
-        nuance_codes = list(df_raw.iloc[0])  # codes nuances
+        headers = list(df_raw.columns)
+        nb_headers, has_elu = detect_header_rows(df_raw)
 
-        # Colonnes meta = les 6-7 premières
+        if nb_headers == 2:
+            # Row 0 of df = nuance codes (2nd header row of CSV)
+            nuance_codes = list(df_raw.iloc[0])
+            data_rows = df_raw.iloc[1:]
+        else:
+            # 1981 : codes sont dans df.columns directement, données dès la première ligne
+            nuance_codes = headers
+            data_rows = df_raw
+
+        # Trouver où se terminent les colonnes meta (avant les colonnes parti)
         meta_end = 0
+        elu_col_idx = None
         for i, h in enumerate(headers):
             h_low = str(h).lower()
+            if 'lu' in h_low and 'tour' in h_low:
+                elu_col_idx = i
             if 'blancs' in h_low or 'nuls' in h_low:
                 meta_end = i + 1
                 break
 
+        if meta_end == 0:
+            # 1981 T2 : pas de colonne Blancs et nuls — meta cols jusqu'à 'Exprimés'
+            for i, h in enumerate(headers):
+                if 'exprim' in str(h).lower():
+                    meta_end = i + 1
+                    break
+
         party_headers = headers[meta_end:]
-        party_codes = [str(c) for c in nuance_codes[meta_end:]]
+        party_codes_raw = [str(c) for c in nuance_codes[meta_end:]]
+
+        # Déduplication : si plusieurs colonnes ont le même code nuance dans le même circo,
+        # on les distingue par index pour éviter les faux matchs au merge
+        seen_codes = {}
+        party_codes = []
+        for pc in party_codes_raw:
+            if pc == 'nan' or pc == '':
+                party_codes.append(pc)
+                continue
+            if pc in seen_codes:
+                seen_codes[pc] += 1
+                party_codes.append(f"{pc}#{seen_codes[pc]}")
+            else:
+                seen_codes[pc] = 0
+                party_codes.append(pc)
 
         rows = []
-        for _, row in df_raw.iloc[1:].iterrows():
+        for _, row in data_rows.iterrows():
             dept_raw = str(row.iloc[0])
-            dept_code = dept_raw.zfill(2) if dept_raw.isdigit() else dept_raw
+            if dept_raw in ('nan', 'None', ''):
+                continue
+            dept_code = _normalize_code(dept_raw, 2)
             departement = str(row.iloc[1])
             circo_raw = str(row.iloc[2])
-            circo_num = circo_raw.zfill(2) if circo_raw.isdigit() else circo_raw
+            if circo_raw in ('nan', 'None', ''):
+                continue
+            circo_num = _normalize_code(circo_raw, 2)
             id_circo = f"{dept_code}-{circo_num}"
+
+            # Skip élu premier tour = 'O'
+            if elu_col_idx is not None:
+                elu_val = str(row.iloc[elu_col_idx]).strip().upper()
+                if elu_val == 'O':
+                    continue
 
             inscrits = _to_int(row.iloc[3])
             votants = _to_int(row.iloc[4])
@@ -979,7 +1058,7 @@ def parse_cdsp_partis_v2(df_t1_raw, df_t2_raw, annee):
                     'circo': circo_num,
                     'nom_candidat': f"[{pc}]",
                     'etiquette': str(ph)[:100],
-                    'nuance': pc if pc != 'nan' else str(ph)[:10],
+                    'nuance': pc if pc not in ('nan', '') else str(ph)[:10],
                     'inscrits': inscrits,
                     'votants': votants,
                     'exprimes': exprimes,
@@ -992,23 +1071,114 @@ def parse_cdsp_partis_v2(df_t1_raw, df_t2_raw, annee):
         return pd.DataFrame(rows)
 
     df_t1 = parse_round(df_t1_raw, is_t2=False)
-    df_t2 = parse_round(df_t2_raw, is_t2=True)
+    df_t2 = parse_round(df_t2_raw, is_t2=True) if df_t2_raw is not None else pd.DataFrame()
 
-    return merge_tours(df_t1, df_t2, annee)
+    if df_t2.empty:
+        return merge_tours(df_t1, pd.DataFrame(), annee)
+
+    # Remapper les codes T2 → T1 pour les années avec divergences (ex: 1968 PC→COM)
+    code_map = T2_TO_T1_CODE.get(annee, {})
+    if code_map and not df_t2.empty:
+        def remap(nc):
+            base = nc.split('#')[0]  # retire le suffixe de déduplication
+            mapped = code_map.get(base, base)
+            return f"[{mapped}]"
+        df_t2['nom_candidat'] = df_t2['nom_candidat'].apply(
+            lambda nc: remap(nc) if nc.startswith('[') else nc
+        )
+
+    # Agréger les lignes de même (id_circo, base_nuance_code) pour éviter de compter
+    # deux fois les partis avec des colonnes dupliquées (ex: 1967 deux colonnes 'COM')
+    # On garde le nom_candidat sans suffixe #N et on somme les voix.
+    def aggregate_dupes(df):
+        if df.empty:
+            return df
+        df = df.copy()
+        df['_base_nom'] = df['nom_candidat'].str.replace(r'#\d+$', '', regex=True)
+        meta = ['id_circo', 'departement', 'dept_code', 'circo',
+                'etiquette', 'nuance', 'inscrits', 'votants', 'exprimes', 'blancs']
+        agg = df.groupby(['id_circo', '_base_nom'], as_index=False).agg(
+            voix=('voix', 'sum'),
+            **{c: (c, 'first') for c in meta if c in df.columns}
+        )
+        agg['nom_candidat'] = agg['_base_nom']
+        agg = agg.drop(columns=['_base_nom'])
+        # Garder aussi 'nuls' et 'acces' si présents
+        for c in ['nuls', 'acces']:
+            if c in df.columns:
+                agg[c] = df.groupby(['id_circo', '_base_nom'])[c].first().values
+        return agg
+
+    df_t1 = aggregate_dupes(df_t1)
+    df_t2 = aggregate_dupes(df_t2)
+
+    # Pour les T2 entries qui ne trouvent pas de correspondance en T1, on les ajoute quand même
+    # comme nouvelles lignes (avec voix_t1=NULL) pour ne pas perdre la config T2
+    t1_keys = set(zip(df_t1['id_circo'], df_t1['nom_candidat']))
+    t2_unmatched = df_t2[~df_t2.apply(
+        lambda r: (r['id_circo'], r['nom_candidat']) in t1_keys, axis=1
+    )].copy()
+
+    merged = merge_tours(df_t1, df_t2, annee)
+
+    # Ajouter les T2 non-matchés comme lignes supplémentaires avec voix_t1=NULL
+    if not t2_unmatched.empty:
+        pct, base = seuil_qualification(annee)
+        extra_rows = []
+        for _, r in t2_unmatched.iterrows():
+            extra_rows.append({
+                'id_circo': r['id_circo'],
+                'departement': r['departement'],
+                'nom_candidat': r['nom_candidat'],
+                'etiquette': r['etiquette'],
+                'nuance': r['nuance'],
+                'voix_t1': None,
+                'qualifie_t2': False,
+                'maintenu_t2': True,
+                'voix_t2': r['voix'],
+                'elu': False,
+                'inscrits_t1': r['inscrits'],
+                'inscrits_t2': r['inscrits'],
+                'votants_t1': r['votants'],
+                'votants_t2': r['votants'],
+                'blancs_t1': r['blancs'],
+                'blancs_t2': r['blancs'],
+                'nuls_t1': None,
+                'nuls_t2': None,
+                'exprimes_t1': r['exprimes'],
+                'exprimes_t2': r['exprimes'],
+            })
+        if extra_rows:
+            df_extra = pd.DataFrame(extra_rows)
+            merged = pd.concat([merged, df_extra], ignore_index=True)
+
+    return merged
 
 
 def compute_triangulaires(conn):
-    """Calcule les triangulaires (circos avec 3+ candidats qualifiés au T2)."""
-    query = """
-    SELECT annee, id_circo, departement,
-           COUNT(*) as nb_qualifies,
-           SUM(CASE WHEN maintenu_t2 = 1 THEN 1 ELSE 0 END) as nb_maintenus,
-           GROUP_CONCAT(nuance || ':' || COALESCE(voix_t1, 0), '; ') as candidats
+    """Exporte les candidats présents au T2 dans les circos à 3+ candidats (triangulaires+)."""
+    # Compter le nombre de candidats ayant voté au T2 par circo
+    config_query = """
+    SELECT annee, id_circo, COUNT(*) as config_t2
     FROM resultats
-    WHERE qualifie_t2 = 1
+    WHERE voix_t2 IS NOT NULL AND voix_t2 > 0
     GROUP BY annee, id_circo
-    HAVING nb_maintenus >= 3
-    ORDER BY annee, id_circo
+    HAVING config_t2 >= 3
+    """
+    # Récupérer toutes les lignes des candidats maintenus dans ces circos
+    query = """
+    SELECT r.annee, r.id_circo, r.departement, r.nom_candidat, r.etiquette, r.nuance,
+           r.voix_t1, r.voix_t2, r.elu, c.config_t2
+    FROM resultats r
+    JOIN (
+        SELECT annee, id_circo, COUNT(*) as config_t2
+        FROM resultats
+        WHERE voix_t2 IS NOT NULL AND voix_t2 > 0
+        GROUP BY annee, id_circo
+        HAVING config_t2 >= 3
+    ) c ON r.annee = c.annee AND r.id_circo = c.id_circo
+    WHERE r.voix_t2 IS NOT NULL AND r.voix_t2 > 0
+    ORDER BY r.annee, r.id_circo, r.voix_t2 DESC
     """
     df = pd.read_sql(query, conn)
     return df
