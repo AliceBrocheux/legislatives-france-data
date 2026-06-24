@@ -355,6 +355,163 @@ def detect_xlsx_format(df_raw):
     return 'unknown'
 
 
+def parse_xls_ministere_2002_2012(path, annee):
+    """
+    Parse les fichiers XLS du Ministère pour 2002, 2007, 2012.
+    Format: onglets 'Circo leg T1'/'Circo Leg T1', 'Circo leg T2', 'Elus'
+    Structure large: une ligne = une circonscription, candidats en colonnes répétées.
+    Colonnes 0-14: meta (dept, circo, inscrits, votants, exprimés, blancs+nuls)
+    Colonnes 15+: blocs de 7 par candidat (Sexe, Nom, Prénom, Nuance, Voix, %/Ins, %/Exp)
+    """
+    import xlrd
+
+    wb = xlrd.open_workbook(str(path))
+    sheet_names = wb.sheet_names()
+
+    def get_sheet(wb, candidates):
+        for name in candidates:
+            if name in sheet_names:
+                return wb.sheet_by_name(name)
+        return None
+
+    sh_t1 = get_sheet(wb, ['Circo leg T1', 'Circo Leg T1'])
+    sh_t2 = get_sheet(wb, ['Circo leg T2', 'Circo Leg T2'])
+    sh_elu = get_sheet(wb, ['Elus'])
+
+    def parse_sheet_wide(sh):
+        if sh is None:
+            return pd.DataFrame()
+        headers = [str(sh.cell_value(0, j)) for j in range(sh.ncols)]
+        rows = []
+        for i in range(1, sh.nrows):
+            dept_raw = _normalize_code(sh.cell_value(i, 0))
+            dept_label = str(sh.cell_value(i, 1)).strip()
+            circo_raw = _normalize_code(sh.cell_value(i, 2))
+            id_circo = f"{dept_raw}-{circo_raw}"
+
+            inscrits = _to_int(sh.cell_value(i, 4))
+            votants_raw = sh.cell_value(i, 7)
+            abstentions_raw = sh.cell_value(i, 5)
+            inscrits_v = inscrits
+            votants = _to_int(votants_raw)
+            if votants is None and inscrits is not None:
+                abs_v = _to_int(abstentions_raw)
+                if abs_v is not None:
+                    votants = inscrits - abs_v
+            blancs_nuls = _to_int(sh.cell_value(i, 9))
+            exprimes = _to_int(sh.cell_value(i, 12))
+
+            # Candidats en blocs de 7 à partir de col 15
+            j = 15
+            while j + 4 < sh.ncols:
+                nom = str(sh.cell_value(i, j + 1)).strip()
+                if not nom or nom in ('nan', 'None', ''):
+                    j += 7
+                    continue
+                prenom = str(sh.cell_value(i, j + 2)).strip()
+                nuance = str(sh.cell_value(i, j + 3)).strip()
+                voix = _to_int(sh.cell_value(i, j + 4))
+                nom_complet = f"{nom} {prenom}".strip()
+                rows.append({
+                    'id_circo': id_circo,
+                    'departement': dept_label,
+                    'nom_candidat': nom_complet,
+                    'etiquette': nuance,
+                    'nuance': nuance,
+                    'inscrits': inscrits_v,
+                    'votants': votants,
+                    'blancs': blancs_nuls,
+                    'nuls': None,
+                    'exprimes': exprimes,
+                    'voix': voix,
+                    'elu': False,
+                })
+                j += 7
+        return pd.DataFrame(rows)
+
+    # Lire les élu(e)s depuis l'onglet Elus
+    elus_set = set()  # (id_circo,) -> True si élu en T2 (on utilisera voix max en T2)
+    elus_t1 = set()  # circos where winner is elected at T1
+    if sh_elu is not None:
+        for i in range(1, sh_elu.nrows):
+            dept_raw = _normalize_code(sh_elu.cell_value(i, 0))
+            circo_raw = _normalize_code(sh_elu.cell_value(i, 2))
+            id_circo = f"{dept_raw}-{circo_raw}"
+            tour = _to_int(sh_elu.cell_value(i, 7))
+            if tour == 1:
+                elus_t1.add(id_circo)
+
+    df_t1 = parse_sheet_wide(sh_t1)
+    df_t2 = parse_sheet_wide(sh_t2)
+
+    if df_t1.empty:
+        return pd.DataFrame()
+
+    # Calculer qualifie_t2
+    df_t1['qualifie_t2'] = df_t1.apply(
+        lambda r: calculer_qualifie(r['voix'], r['inscrits'], r['exprimes'], annee),
+        axis=1
+    )
+
+    # Marquer les élus au T1 (gagnent sans T2)
+    df_t1['elu'] = df_t1['id_circo'].isin(elus_t1)
+
+    if df_t2.empty:
+        df_t1['voix_t2'] = None
+        df_t1['inscrits_t2'] = None
+        df_t1['votants_t2'] = None
+        df_t1['blancs_t2'] = None
+        df_t1['nuls_t2'] = None
+        df_t1['exprimes_t2'] = None
+        df_t1['maintenu_t2'] = None
+        return _rename_t1(df_t1)
+
+    # Identifier l'élu en T2: candidat avec le plus de voix en T2 dans chaque circo
+    # sauf pour les circos où l'élu est au T1
+    t2_max = df_t2[~df_t2['id_circo'].isin(elus_t1)].copy()
+    if not t2_max.empty:
+        idx_max = t2_max.groupby('id_circo')['voix'].idxmax()
+        elu_idx = set(idx_max.values)
+        df_t2['elu'] = df_t2.index.isin(elu_idx)
+
+    # Merge T1 et T2 sur (id_circo, nom_candidat normalisé)
+    df_t1['nom_key'] = df_t1['nom_candidat'].str.upper().str.strip()
+    df_t2['nom_key'] = df_t2['nom_candidat'].str.upper().str.strip()
+
+    t2_rename = df_t2.rename(columns={
+        'voix': 'voix_t2', 'inscrits': 'inscrits_t2', 'votants': 'votants_t2',
+        'exprimes': 'exprimes_t2', 'blancs': 'blancs_t2', 'nuls': 'nuls_t2',
+        'elu': 'elu_t2',
+    })
+    t2_cols = ['id_circo', 'nom_key', 'voix_t2', 'inscrits_t2', 'votants_t2',
+               'exprimes_t2', 'blancs_t2', 'nuls_t2', 'elu_t2']
+    t2_cols = [c for c in t2_cols if c in t2_rename.columns]
+    t2_merge = t2_rename[t2_cols].drop_duplicates(subset=['id_circo', 'nom_key'])
+
+    df_t1_noelu = df_t1.drop(columns=['elu'], errors='ignore')
+    df = df_t1_noelu.merge(t2_merge, on=['id_circo', 'nom_key'], how='left')
+
+    def calc_maintenu(row):
+        if not row['qualifie_t2']:
+            return None
+        v2 = _to_int(row.get('voix_t2'))
+        if v2 is not None and v2 > 0:
+            return True
+        return False
+
+    df['maintenu_t2'] = df.apply(calc_maintenu, axis=1)
+
+    if 'elu_t2' in df.columns:
+        df['elu'] = df['elu_t2'].fillna(False)
+        df['elu'] = df.apply(lambda r: True if r['id_circo'] in elus_t1 and r['voix'] == df_t1[df_t1['id_circo'] == r['id_circo']]['voix'].max() else r['elu'], axis=1)
+        df = df.drop(columns=['elu_t2'])
+    else:
+        df['elu'] = False
+
+    df = df.drop(columns=['nom_key'], errors='ignore')
+    return _rename_t1(df)
+
+
 def parse_xlsx_ministere(path_t1, path_t2, annee):
     """Parse les fichiers XLSX du Ministère (2017, 2022, 2024)."""
     df_t1_raw = pd.read_excel(path_t1, header=None)
@@ -765,8 +922,8 @@ def run_pipeline():
     print("Pipeline élections législatives françaises 1958-2024")
     print("=" * 60)
 
-    # ── CDSP 1958-2012 ──────────────────────────────────────────
-    cdsp_years = [1958, 1962, 1967, 1968, 1973, 1978, 1981, 1988, 1993, 1997, 2002, 2007, 2012]
+    # ── CDSP 1958-1997 ──────────────────────────────────────────
+    cdsp_years = [1958, 1962, 1967, 1968, 1973, 1978, 1981, 1988, 1993, 1997]
 
     for annee in cdsp_years:
         print(f"\n[CDSP] {annee}...")
@@ -812,6 +969,40 @@ def run_pipeline():
             n_rows = len(df_final)
             print(f"  OK: {n_rows} lignes, {n_circos} circos")
             coverage[annee] = {'status': 'ok', 'rows': n_rows, 'circos': n_circos, 'source': 'CDSP'}
+
+            if not df_final.empty:
+                all_results.append(df_final)
+
+        except Exception as e:
+            print(f"  ERREUR: {e}")
+            import traceback
+            traceback.print_exc()
+            coverage[annee] = {'status': 'error', 'error': str(e), 'rows': 0}
+
+    # ── Ministère 2002-2012 (XLS format large circo) ────────────
+    min_xls_years = [
+        (2002, 'Leg_2002_Resultats.xls'),
+        (2007, 'Leg_2007_Resultats_v2.xls'),
+        (2012, 'Leg_2012_Resultats.xls'),
+    ]
+
+    for annee, fname in min_xls_years:
+        print(f"\n[Ministère] {annee}...")
+        path = RAW_MIN / fname
+
+        if not path.exists():
+            print(f"  SKIP: {path} manquant")
+            coverage[annee] = {'status': 'missing', 'rows': 0}
+            continue
+
+        try:
+            df_parsed = parse_xls_ministere_2002_2012(path, annee)
+            df_final = build_resultats_table(annee, df_parsed)
+
+            n_circos = df_final['id_circo'].nunique() if not df_final.empty else 0
+            n_rows = len(df_final)
+            print(f"  OK: {n_rows} lignes, {n_circos} circos")
+            coverage[annee] = {'status': 'ok', 'rows': n_rows, 'circos': n_circos, 'source': 'Ministère'}
 
             if not df_final.empty:
                 all_results.append(df_final)

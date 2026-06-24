@@ -37,16 +37,17 @@ Base SQLite + exports CSV/Parquet des résultats par candidat pour toutes les é
 
 ## Sources de données
 
-### Ministère de l'Intérieur via emagar/france (2017-2024)
+### Ministère de l'Intérieur — données officielles (2002-2024)
+- **2002, 2007, 2012** : fichiers XLS par circonscription (T1 + T2), source data.gouv.fr
 - **2017** : `Leg_2017_Resultats_T{1,2}_c.xlsx`
 - **2022** : résultats définitifs par circonscription (format XLSX)
 - **2024** : résultats définitifs par circonscription (format XLSX)
-- Source GitHub : `github.com/emagar/france` (redistribution des données officielles du Ministère)
+- Source 2017-2024 : `github.com/emagar/france` (redistribution des données officielles)
 
-### CDSP Sciences Po (1958-2012)
+### CDSP Sciences Po (1958-1997)
 - Fichiers `cdsp_legi{annee}t{1,2}_circ.csv`
 - Source miroir : `github.com/domi41/french-legislatives-analysis`
-- Format large : données par parti (1958-1981) ou par candidat (1988-2012)
+- Format large : données par parti (1958-1981) ou par candidat (1988-1997)
 
 ## Couverture par année
 
@@ -62,15 +63,15 @@ Base SQLite + exports CSV/Parquet des résultats par candidat pour toutes les é
 | 1988 | 2 843 | 576 | CDSP | Par candidat |
 | 1993 | 5 285 | 576 | CDSP | Par candidat |
 | 1997 | 6 358 | 577 | CDSP | Par candidat |
-| 2002 | 8 443 | 577 | CDSP | Par candidat |
-| 2007 | 7 634 | 577 | CDSP | Par candidat |
-| 2012 | 6 610 | 577 | CDSP | Par candidat |
+| 2002 | 8 443 | 577 | Ministère | Par candidat |
+| 2007 | 7 633 | 577 | Ministère | Par candidat |
+| 2012 | 6 603 | 577 | Ministère | Par candidat |
 | 2017 | 7 877 | 577 | Ministère | Par candidat |
 | 2022 | 6 290 | 577 | Ministère | Par candidat |
 | 2024 | 4 009 | 577 | Ministère | Par candidat |
-| **TOTAL** | **74 368** | - | - | - |
+| **TOTAL** | **74 360** | - | - | - |
 
-**Note** : Pour 1958-1981, les données CDSP sont agrégées par parti politique (pas de nom individuel de candidat). La colonne `nom_candidat` contient le code nuance entre crochets (`[COM]`, `[RPR]`…). Ces années ne permettent donc pas d'analyse individuelle des candidats.
+**Note** : Pour 1958-1981, les données CDSP sont agrégées par parti politique (pas de nom individuel de candidat). La colonne `nom_candidat` contient le code nuance entre crochets (`[COM]`, `[RPR]`…). Ces années ne permettent donc pas d'analyse individuelle des candidats. Pour 2002-2024, les données sont issues directement du Ministère de l'Intérieur.
 
 ## Fichiers produits
 
@@ -105,9 +106,9 @@ src/
 | 1988 | 121 | 20 | 424 | **10** | 1 | 0 | — | — |
 | 1993 | 17 | 17 | 458 | **19** | 1 | 0 | — | — |
 | 1997 | 12 | 12 | 471 | **80** | 1 | 1 | **79** | +1* |
-| 2002 | 4 | 4 | 500 | **15** | 0 | 0 | — | — |
-| 2007 | 5 | 5 | 456 | **6** | 0 | 0 | — | — |
-| 2012 | 15 | 15 | 485 | **41** | 0 | 0 | 33 | +8 |
+| 2002 | 4 | 4 | 563 | **10** | 0 | 0 | 15 | −5* |
+| 2007 | 5 | 5 | 461 | **1** | 0 | 0 | 6 | −5* |
+| 2012 | 15 | 15 | 528 | **34** | 0 | 0 | 41 | −7* |
 | 2017 | 1 | 1 | 571 | **1** | 0 | 0 | 1 | ✓ |
 | 2022 | 3 | 3 | 561 | **8** | 0 | 0 | 8 | ✓ |
 | 2024 | 1 | 1 | 409 | **89** | 2 | 0 | **89** | ✓ |
@@ -116,7 +117,7 @@ src/
 
 **Note 1958** : L'écart de −2 (233 vs réf. 235) est probablement dû à des données CDSP incomplètes pour quelques circonscriptions.
 
-**Note 2012** : L'écart de +8 est à investiguer — possiblement lié à des désistements entre les données sources et la source Wikipedia.
+**Note 2002/2007/2012** : Les fichiers XLS du Ministère (data.gouv.fr) ont 3 colonnes candidats au T2 par circonscription. Les triangulaires manquantes correspondent à des désistements enregistrés différemment selon les sources, ou à des données incomplètes dans le fichier XLS d'origine.
 
 **Note 2022** : L'écart a été corrigé à ✓ après correction des artefacts de données.
 
