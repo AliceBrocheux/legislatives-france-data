@@ -922,7 +922,7 @@ def run_pipeline():
     print("=" * 60)
 
     # ── CDSP 1958-1997 ──────────────────────────────────────────
-    cdsp_years = [1958, 1962, 1967, 1968, 1973, 1978, 1981, 1988, 1993, 1997]
+    cdsp_years = [1958, 1962, 1967, 1968, 1973, 1978, 1981, 1988]
 
     for annee in cdsp_years:
         print(f"\n[CDSP] {annee}...")
@@ -980,6 +980,8 @@ def run_pipeline():
 
     # ── Ministère 2002-2012 (XLS format large circo) ────────────
     min_xls_years = [
+        (1993, 'Leg_1993_Resultats.xls'),
+        (1997, 'Leg_1997_Resultats.xls'),
         (2002, 'Leg_2002_Resultats.xls'),
         (2007, 'Leg_2007_Resultats_v2.xls'),
         (2012, 'Leg_2012_Resultats.xls'),
