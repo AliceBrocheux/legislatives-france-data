@@ -59,7 +59,7 @@ Base SQLite + exports CSV/Parquet des résultats par candidat pour toutes les é
 | 1968 | 2 928 | 470 | CDSP | Agrégé par parti |
 | 1973 | 2 838 | 473 | CDSP | Agrégé par parti |
 | 1978 | 3 350 | 474 | CDSP | Agrégé par parti |
-| 1981 | 2 937 | 473 | CDSP | Agrégé par parti |
+| 1981 | 2 329 | 474 | CDSP | Agrégé par parti |
 | 1988 | 2 843 | 576 | CDSP | Par candidat |
 | 1993 | 5 220 | 570 | Ministère | Par candidat |
 | 1997 | 6 360 | 577 | Ministère | Par candidat |
@@ -67,11 +67,13 @@ Base SQLite + exports CSV/Parquet des résultats par candidat pour toutes les é
 | 2007 | 7 633 | 577 | Ministère | Par candidat |
 | 2012 | 6 603 | 577 | Ministère | Par candidat |
 | 2017 | 7 877 | 577 | Ministère | Par candidat |
-| 2022 | 6 290 | 577 | Ministère | Par candidat |
+| 2022 | 6 289 | 577 | Ministère | Par candidat |
 | 2024 | 4 009 | 577 | Ministère | Par candidat |
-| **TOTAL** | **74 232** | - | - | - |
+| **TOTAL** | **73 688** | - | - | - |
 
-**Note** : Pour 1958-1981, les données CDSP sont agrégées par parti politique (pas de nom individuel de candidat). La colonne `nom_candidat` contient le code nuance entre crochets (`[COM]`, `[RPR]`…). Ces années ne permettent donc pas d'analyse individuelle des candidats. Pour 1993-2024, les données sont issues directement du Ministère de l'Intérieur (data.gouv.fr). Le fichier 1993 du Ministère contient 570 circonscriptions sur 576 (6 circos absentes de la source).
+**Note** : Pour 1958-1981, les données CDSP sont agrégées par parti politique (pas de nom individuel de candidat). La colonne `nom_candidat` contient le code nuance entre crochets (`[COM]`, `[RPR]`…). Ces années ne permettent donc pas d'analyse individuelle des candidats. Pour 1993-2024, les données sont issues directement du Ministère de l'Intérieur (data.gouv.fr). Le fichier 1993 du Ministère contient 570 circonscriptions sur 577 (7 circos absentes de la source).
+
+**Note 1988** : La source CDSP couvre 576 circonscriptions sur 577 ; la circonscription manquante est vraisemblablement Wallis-et-Futuna (absente du fichier CDSP 1988).
 
 **Note 1988** : Données CDSP (par candidat) — pas de fichier Ministère disponible sur data.gouv.fr pour cette année.
 

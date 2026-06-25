@@ -1326,11 +1326,14 @@ def parse_cdsp_partis_v2(df_t1_raw, df_t2_raw, annee):
         1981 T2 : 1 seule ligne de header, pas de colonne élu.
         1958-1978 : 2 lignes de header, colonne élu premier tour en T2."""
         headers = list(df_raw.columns)
-        # Si la première colonne ressemble à un code ou un numéro → 1 header row (1981)
-        first_col = str(headers[0]).lower()
-        if 'code' not in first_col and 'département' not in first_col and 'dep' not in first_col:
+        # Si la première valeur de données est numérique (code dept), alors 1 seule ligne de header (1981)
+        # Pour 1958-1978, la 2e ligne de header a NaN en col 0
+        first_data_val = df_raw.iloc[0, 0]
+        import numpy as np
+        if not (isinstance(first_data_val, float) and np.isnan(first_data_val)):
+            # 1981: données directement, 1 header row
             return 1, False
-        # Cherche colonne élu premier tour dans les headers
+        # 1958-1978: 2 lignes de header
         has_elu = any('lu' in str(h).lower() and 'tour' in str(h).lower() for h in headers)
         return 2, has_elu
 
