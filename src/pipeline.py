@@ -624,10 +624,9 @@ def parse_xlsx_2024(df_t1_raw, df_t2_raw, annee):
 
                 nom_complet = f"{nom} {prenom}".strip() if prenom else nom
 
-                # Dans 2024, Elu = position numéro si élu, sinon le numéro de panneau
-                # En T1: "2" = qualifié (accès T2), en T2: "élu" = élu
+                # Dans 2024, Elu = "élu" si élu (T1 ou T2)
                 elu = False
-                if is_t2 and elu_raw is not None:
+                if elu_raw is not None:
                     elu_str = str(elu_raw).lower()
                     if 'élu' in elu_str or 'elu' in elu_str:
                         elu = True
@@ -728,7 +727,7 @@ def parse_xlsx_2017_2022(df_t1_raw, df_t2_raw, annee):
                 voix = _to_int(row[voix_col]) if voix_col else None
 
                 elu = False
-                if is_t2 and elu_col:
+                if elu_col:
                     elu_raw = str(row[elu_col]).lower()
                     if 'élu' in elu_raw or 'elu' in elu_raw or elu_raw == '1' or elu_raw == 'true':
                         elu = True
@@ -803,8 +802,9 @@ def merge_tours_ministere(df_t1, df_t2, annee, has_elu_in_t2=True):
     t2_cols = [c for c in t2_cols if c in t2_agg.columns]
     t2_merge = t2_agg[t2_cols].drop_duplicates(subset=['id_circo', 'nom_key'])
 
-    # Supprimer la colonne elu de T1 (toujours False) avant merge pour éviter conflit
-    df_t1 = df_t1.drop(columns=['elu'], errors='ignore')
+    # Renommer elu T1 avant merge pour éviter conflit
+    if 'elu' in df_t1.columns:
+        df_t1 = df_t1.rename(columns={'elu': 'elu_t1'})
     df = df_t1.merge(t2_merge, on=['id_circo', 'nom_key'], how='left')
 
     # maintenu_t2
@@ -817,12 +817,11 @@ def merge_tours_ministere(df_t1, df_t2, annee, has_elu_in_t2=True):
 
     df['maintenu_t2'] = df.apply(calc_maintenu, axis=1)
 
-    # elu: récupéré du T2
-    if 'elu_t2' in df.columns:
-        df['elu'] = df['elu_t2'].fillna(False)
-        df = df.drop(columns=['elu_t2'])
-    else:
-        df['elu'] = False
+    # elu: élu au T1 OU au T2
+    elu_t1 = df.get('elu_t1', pd.Series(False, index=df.index)).fillna(False)
+    elu_t2 = df.get('elu_t2', pd.Series(False, index=df.index)).fillna(False)
+    df['elu'] = elu_t1 | elu_t2
+    df = df.drop(columns=['elu_t1', 'elu_t2'], errors='ignore')
 
     df = df.drop(columns=['nom_key'], errors='ignore')
     return _rename_t1(df)

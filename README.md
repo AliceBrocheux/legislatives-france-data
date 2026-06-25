@@ -106,12 +106,12 @@ src/
 | 1988 | 121 | 20 | 424 | **10** | 1 | 0 | — | — |
 | 1993 | 17 | 17 | 458 | **19** | 1 | 0 | — | — |
 | 1997 | 12 | 12 | 471 | **80** | 1 | 1 | **79** | +1* |
-| 2002 | 4 | 4 | 563 | **10** | 0 | 0 | 15 | −5* |
-| 2007 | 5 | 5 | 461 | **1** | 0 | 0 | 6 | −5* |
-| 2012 | 15 | 15 | 528 | **34** | 0 | 0 | 41 | −7* |
-| 2017 | 1 | 1 | 571 | **1** | 0 | 0 | 1 | ✓ |
-| 2022 | 3 | 3 | 561 | **8** | 0 | 0 | 8 | ✓ |
-| 2024 | 1 | 1 | 409 | **89** | 2 | 0 | **89** | ✓ |
+| 2002 | 58 | 4 | 505 | **10** | 0 | 0 | 15 | −5* |
+| 2007 | 110 | 3 | 463 | **1** | 0 | 0 | 6 | −5* |
+| 2012 | 36 | 15 | 492 | **34** | 0 | 0 | 41 | −7* |
+| 2017 | 4 | 1 | 571 | **1** | 0 | 0 | 1 | ✓ |
+| 2022 | 5 | 3 | 561 | **8** | 0 | 0 | 8 | ✓ |
+| 2024 | 76 | 1 | 409 | **89** | 2 | 0 | **89** | ✓ |
 
 *1997 : la 79e circo est une quintuangulaire (5 maintenus) ; en comptant "3+", on retrouve bien 79+1 quinquangulaire = 80 ✓.
 
@@ -119,7 +119,7 @@ src/
 
 **Note 2002/2007/2012** : Les fichiers XLS du Ministère (data.gouv.fr) ont 3 colonnes candidats au T2 par circonscription. Les triangulaires manquantes correspondent à des désistements enregistrés différemment selon les sources, ou à des données incomplètes dans le fichier XLS d'origine.
 
-**Note 2022** : L'écart a été corrigé à ✓ après correction des artefacts de données.
+*2002/2007/2012 : les fichiers XLS Ministère ont 3 slots candidats au T2 ; les triangulaires manquantes sont des désistements comptabilisés différemment.
 
 ## Limitations connues
 
