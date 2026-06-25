@@ -3,10 +3,11 @@
 Pipeline de construction de la base des élections législatives françaises (1958-2024).
 
 Sources:
-  - CDSP Sciences Po (1958-2012) : format CSV large, candidats en colonnes
+  - CDSP Sciences Po (1958-1988) : format CSV large, candidats en colonnes
     Source: github.com/domi41/french-legislatives-analysis
-  - Ministère de l'Intérieur (2017-2024) : format XLSX large, candidats en colonnes
-    Source: github.com/emagar/france
+  - Ministère de l'Intérieur (1993-2024) : format XLS/XLSX large, candidats en colonnes
+    Source 1993-2012: data.gouv.fr (fichiers XLS par circonscription)
+    Source 2017-2024: data.gouv.fr (fichiers XLSX officiels)
 
 Architecture:
   - Une ligne = un candidat, une élection, une circonscription
@@ -525,6 +526,152 @@ def parse_xlsx_ministere(path_t1, path_t2, annee):
         return parse_xlsx_2017_2022(df_t1_raw, df_t2_raw, annee)
 
 
+def parse_xlsx_officiel_cirlg(path_t1, path_t2, annee):
+    """
+    Parse les fichiers XLSX officiels data.gouv.fr pour 2017 et 2022.
+
+    2017: multi-onglets, onglet 'Circo. leg. T1/T2', titre en ligne 0-1, headers ligne 2, données ligne 3+
+          Blocs candidats de 9 cols à partir de col 18 (N°Panneau, Sexe, Nom, Prénom, Nuance, Voix, %/Ins, %/Exp, Sièges)
+    2022: onglet unique 'Feuil1', headers ligne 0, données ligne 1+, col 4 = 'Etat saisie' (extra)
+          Blocs candidats de 9 cols à partir de col 19
+    """
+    def parse_one(path, is_t2=False):
+        xl = pd.ExcelFile(path)
+        sheet_names = xl.sheet_names
+
+        # Déterminer l'onglet et la structure
+        circo_sheet = None
+        for candidate in ['Circo. leg. T1', 'Circo. leg. T2', 'Feuil1']:
+            if candidate in sheet_names:
+                circo_sheet = candidate
+                break
+        if circo_sheet is None:
+            circo_sheet = sheet_names[0]
+
+        df_raw = xl.parse(circo_sheet, header=None)
+
+        # Détecter la ligne de headers et le début des données
+        # 2017: row 0 = titre, row 1 = vide, row 2 = headers, data à partir de row 3
+        # 2022: row 0 = headers, data à partir de row 1
+        first_col_row0 = str(df_raw.iloc[0, 0])
+        if 'Résultats' in first_col_row0 or 'résultats' in first_col_row0.lower():
+            # Format 2017: headers à la ligne 2
+            header_row = 2
+            data_start = 3
+        else:
+            # Format 2022: headers à la ligne 0
+            header_row = 0
+            data_start = 1
+
+        headers = list(df_raw.iloc[header_row])
+        df = df_raw.iloc[data_start:].copy()
+        df.columns = headers
+        df = df.reset_index(drop=True)
+
+        # Supprimer les lignes vides
+        df = df[df.iloc[:, 0].notna()].copy()
+
+        # Colonnes meta
+        col_dept_code = headers[0]   # 'Code du département'
+        col_dept_label = headers[1]  # 'Libellé du département'
+        col_circo_code = headers[2]  # 'Code de la circonscription'
+
+        # Trouver le début des blocs candidats: chercher 'N°Panneau' ou 'N°panneau'
+        bloc_start = None
+        for i, h in enumerate(headers):
+            if 'panneau' in str(h).lower() or 'n°' in str(h).lower():
+                bloc_start = i
+                break
+        if bloc_start is None:
+            # Fallback: 18 pour 2017, 19 pour 2022
+            bloc_start = 19 if 'Etat saisie' in str(headers) else 18
+
+        # Colonnes meta numériques (entre meta et blocs)
+        inscrits_col = next((h for h in headers if str(h).lower() == 'inscrits'), None)
+        votants_col = next((h for h in headers if str(h).lower() == 'votants'), None)
+        exprimes_col = next((h for h in headers if 'exprim' in str(h).lower() and '%' not in str(h)), None)
+        blancs_col = next((h for h in headers if str(h).lower() == 'blancs'), None)
+        nuls_col = next((h for h in headers if str(h).lower() == 'nuls'), None)
+        abstentions_col = next((h for h in headers if 'abstention' in str(h).lower()), None)
+
+        # Compter le nombre de blocs candidats (9 cols chacun)
+        n_cols = len(headers)
+        n_blocs = (n_cols - bloc_start) // 9
+
+        rows = []
+        for _, row in df.iterrows():
+            dept_raw = str(row[col_dept_code])
+            dept_label = str(row[col_dept_label])
+            circo_raw = str(row[col_circo_code])
+
+            # Normaliser les codes (peuvent être int ou str selon l'année)
+            dept_code = _normalize_code(dept_raw, 2)
+            circo_num = _normalize_code(circo_raw, 2)
+            id_circo = f"{dept_code}-{circo_num}"
+
+            inscrits = _to_int(row.get(inscrits_col))
+            votants = _to_int(row.get(votants_col))
+            exprimes = _to_int(row.get(exprimes_col))
+            blancs = _to_int(row.get(blancs_col))
+            nuls = _to_int(row.get(nuls_col))
+
+            if votants is None and inscrits is not None and abstentions_col:
+                abstentions = _to_int(row.get(abstentions_col))
+                if abstentions is not None:
+                    votants = inscrits - abstentions
+
+            for b in range(n_blocs):
+                base = bloc_start + b * 9
+                if base + 4 >= n_cols:
+                    break
+
+                # Bloc: N°Panneau(0), Sexe(1), Nom(2), Prénom(3), Nuance(4), Voix(5), %/Ins(6), %/Exp(7), Sièges(8)
+                nom_raw = df_raw.iloc[header_row, base + 2]  # label de la colonne pour debug
+                nom = str(row.iloc[base + 2]).strip() if not pd.isna(row.iloc[base + 2]) else ''
+                if not nom or nom in ('nan', 'None', ''):
+                    continue
+
+                prenom = str(row.iloc[base + 3]).strip() if not pd.isna(row.iloc[base + 3]) else ''
+                nuance = str(row.iloc[base + 4]).strip() if not pd.isna(row.iloc[base + 4]) else None
+                voix = _to_int(row.iloc[base + 5])
+                sieges_raw = row.iloc[base + 8] if base + 8 < n_cols else None
+
+                elu = False
+                if sieges_raw is not None and not (isinstance(sieges_raw, float) and np.isnan(sieges_raw)):
+                    s = str(sieges_raw).lower().strip()
+                    if 'élu' in s or 'elu' in s or s == '1':
+                        elu = True
+
+                nom_complet = f"{nom} {prenom}".strip()
+                if nuance in ('nan', 'None', ''):
+                    nuance = None
+
+                rows.append({
+                    'id_circo': id_circo,
+                    'departement': dept_label,
+                    'dept_code': dept_code,
+                    'circo': circo_num,
+                    'nom_candidat': nom_complet,
+                    'etiquette': nuance,
+                    'nuance': nuance,
+                    'inscrits': inscrits,
+                    'votants': votants,
+                    'exprimes': exprimes,
+                    'blancs': blancs,
+                    'nuls': nuls,
+                    'voix': voix,
+                    'acces': '',
+                    'elu': elu,
+                })
+
+        return pd.DataFrame(rows)
+
+    df_t1 = parse_one(path_t1, is_t2=False)
+    df_t2 = parse_one(path_t2, is_t2=True)
+
+    return merge_tours_ministere(df_t1, df_t2, annee, has_elu_in_t2=True)
+
+
 def parse_xlsx_2024(df_t1_raw, df_t2_raw, annee):
     """Parse format 2024: header row 0, data from row 2 (row 1 est vide)."""
 
@@ -614,7 +761,7 @@ def parse_xlsx_2024(df_t1_raw, df_t2_raw, annee):
                                 prenom = str(row[c]) if str(row[c]) != 'nan' else None
                             elif 'nom' in c_low:
                                 nom = str(row[c]) if str(row[c]) != 'nan' else None
-                            elif 'voix' in c_low:
+                            elif 'voix' in c_low and not c_low.startswith('%'):
                                 voix = _to_int(row[c])
                             elif 'elu' in c_low or 'élu' in c_low:
                                 elu_raw = row[c]
@@ -824,7 +971,25 @@ def merge_tours_ministere(df_t1, df_t2, annee, has_elu_in_t2=True):
     df = df.drop(columns=['elu_t1', 'elu_t2'], errors='ignore')
 
     df = df.drop(columns=['nom_key'], errors='ignore')
-    return _rename_t1(df)
+
+    # Deduplicate elu: if a circo has multiple elu=True rows (duplicate names in T1 with different nuances),
+    # keep only the elu flag on the row with the most T2 votes (or T1 votes for T1 winners).
+    df = _rename_t1(df)
+    elu_mask = df['elu'] == True
+    if elu_mask.sum() > df[elu_mask]['id_circo'].nunique():
+        df['_sort_key'] = df.get('voix_t2', pd.Series(None, index=df.index)).fillna(
+            df.get('voix_t1', pd.Series(0, index=df.index)).fillna(0)
+        )
+        # For each circo with multiple elus, keep only the highest-vote one
+        multi_elu_circos = df[elu_mask].groupby('id_circo').size()
+        multi_elu_circos = set(multi_elu_circos[multi_elu_circos > 1].index)
+        for circo in multi_elu_circos:
+            circo_mask = (df['id_circo'] == circo) & elu_mask
+            keep_idx = df.loc[circo_mask, '_sort_key'].idxmax()
+            df.loc[circo_mask, 'elu'] = False
+            df.loc[keep_idx, 'elu'] = True
+        df = df.drop(columns=['_sort_key'])
+    return df
 
 
 # ─── Utilitaires ─────────────────────────────────────────────────────────────
@@ -1014,15 +1179,17 @@ def run_pipeline():
             traceback.print_exc()
             coverage[annee] = {'status': 'error', 'error': str(e), 'rows': 0}
 
-    # ── Ministère 2017-2024 ──────────────────────────────────────
-    min_years = [
-        (2017, 'Leg_2017_Resultats_T1_c.xlsx', 'Leg_2017_Resultats_T2_c.xlsx'),
-        (2022, 'Leg_2022_Resultats_T1.xlsx', 'Leg_2022_Resultats_T2.xlsx'),
-        (2024, 'Leg_2024_Resultats_T1.xlsx', 'Leg_2024_Resultats_T2.xlsx'),
+    # ── Ministère 2017-2024 (données officielles data.gouv.fr) ───
+    # 2017/2022: format multi-blocs cirlg, parser dédié
+    # 2024: format colonnes numérotées, parser générique
+    min_years_officiel = [
+        (2017, 'Leg_2017_Resultats_T1_officiel.xlsx', 'Leg_2017_Resultats_T2_officiel.xlsx', 'cirlg'),
+        (2022, 'Leg_2022_Resultats_T1_officiel.xlsx', 'Leg_2022_Resultats_T2_officiel.xlsx', 'cirlg'),
+        (2024, 'Leg_2024_Resultats_T1_officiel.xlsx', 'Leg_2024_Resultats_T2_officiel.xlsx', '2024'),
     ]
 
-    for annee, fname_t1, fname_t2 in min_years:
-        print(f"\n[Ministère] {annee}...")
+    for annee, fname_t1, fname_t2, fmt in min_years_officiel:
+        print(f"\n[Ministère officiel] {annee}...")
         path_t1 = RAW_MIN / fname_t1
         path_t2 = RAW_MIN / fname_t2
 
@@ -1032,7 +1199,12 @@ def run_pipeline():
             continue
 
         try:
-            df_parsed = parse_xlsx_ministere(path_t1, path_t2, annee)
+            if fmt == 'cirlg':
+                df_parsed = parse_xlsx_officiel_cirlg(path_t1, path_t2, annee)
+            else:
+                df_t1_raw = pd.read_excel(path_t1, header=None)
+                df_t2_raw = pd.read_excel(path_t2, header=None)
+                df_parsed = parse_xlsx_2024(df_t1_raw, df_t2_raw, annee)
             df_final = build_resultats_table(annee, df_parsed)
 
             n_circos = df_final['id_circo'].nunique() if not df_final.empty else 0
@@ -1049,7 +1221,7 @@ def run_pipeline():
             traceback.print_exc()
             coverage[annee] = {'status': 'error', 'error': str(e), 'rows': 0}
 
-    # ── Consolidation ────────────────────────────────────────────
+    # ── Consolidation ─────────────────────────────────────────────
     print("\n" + "=" * 60)
     print("Consolidation...")
 

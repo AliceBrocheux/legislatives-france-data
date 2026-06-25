@@ -39,10 +39,10 @@ Base SQLite + exports CSV/Parquet des résultats par candidat pour toutes les é
 
 ### Ministère de l'Intérieur — données officielles (1993-2024)
 - **1993, 1997, 2002, 2007, 2012** : fichiers XLS par circonscription (T1 + T2), source data.gouv.fr
-- **2017** : `Leg_2017_Resultats_T{1,2}_c.xlsx`
-- **2022** : résultats définitifs par circonscription (format XLSX)
-- **2024** : résultats définitifs par circonscription (format XLSX)
-- Source 2017-2024 : `github.com/emagar/france` (redistribution des données officielles)
+- **2017** : `Leg_2017_Resultats_T{1,2}_c.xlsx` — onglet `Circo. leg. T{1,2}`, blocs de 9 colonnes par candidat
+- **2022** : `resultats-par-niveau-cirlg-t{1,2}-france-entiere.xlsx` — même format + colonne `Etat saisie`
+- **2024** : résultats définitifs par circonscription — colonnes numérotées (`Nom candidat 1`, `Elu 1`…)
+- Source 2017-2024 : `data.gouv.fr` (données officielles téléchargées directement)
 
 ### CDSP Sciences Po (1958-1988)
 - Fichiers `cdsp_legi{annee}t{1,2}_circ.csv`
