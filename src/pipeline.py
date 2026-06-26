@@ -1075,6 +1075,123 @@ def build_resultats_table(annee, df_parsed):
     return df[target_cols]
 
 
+# ─── Placeholders circonscriptions manquantes ─────────────────────────────────
+
+# Nombre de sièges attendus par législature (source: Wikipedia "Nombre de députés par législature")
+SIEGES_PAR_ANNEE = {
+    1958: 576,  # Ire législature (465 métro + 71 Algérie/Sahara + 40 DOM-TOM)
+    1962: 482,  # IIe (465 métro + 17 outre-mer)
+    1967: 487,  # IIIe (+5 région parisienne)
+    1968: 487,
+    1973: 490,  # Ve (+3 région lyonnaise)
+    1978: 491,  # VIe (+1 Corse)
+    1981: 491,
+    1988: 577,  # IXe (577 circos; 575 élus effectifs car boycott NC)
+    1993: 577,
+    1997: 577,
+    2002: 577,
+    2007: 577,
+    2012: 577,
+    2017: 577,
+    2022: 577,
+    2024: 577,
+}
+
+# Circonscriptions outre-mer attendues par période
+# Clé: id_circo, Valeur: libellé département/territoire
+_DOM_1962_1973 = {
+    # DOM (10 sièges)
+    'ZA-01': 'Guadeloupe', 'ZA-02': 'Guadeloupe', 'ZA-03': 'Guadeloupe',
+    'ZB-01': 'Martinique', 'ZB-02': 'Martinique', 'ZB-03': 'Martinique',
+    'ZC-01': 'Guyane',
+    'ZD-01': 'La Réunion', 'ZD-02': 'La Réunion', 'ZD-03': 'La Réunion',
+    # TOM (7 sièges) — Comores encore français, WF sans siège distinct
+    'ZS-01': 'Saint-Pierre-et-Miquelon',
+    'ZK-01': 'Comores', 'ZK-02': 'Comores',
+    'ZN-01': 'Nouvelle-Calédonie', 'ZN-02': 'Nouvelle-Calédonie',
+    'ZP-01': 'Polynésie française', 'ZP-02': 'Polynésie française',
+}  # total: 17
+
+_DOM_1978_1981 = {
+    # DOM (10 sièges, inchangés)
+    'ZA-01': 'Guadeloupe', 'ZA-02': 'Guadeloupe', 'ZA-03': 'Guadeloupe',
+    'ZB-01': 'Martinique', 'ZB-02': 'Martinique', 'ZB-03': 'Martinique',
+    'ZC-01': 'Guyane',
+    'ZD-01': 'La Réunion', 'ZD-02': 'La Réunion', 'ZD-03': 'La Réunion',
+    # TOM (7 sièges) — Comores indépendantes 1975, Mayotte + WF remplacent
+    'ZS-01': 'Saint-Pierre-et-Miquelon',
+    'ZM-01': 'Mayotte',
+    'ZN-01': 'Nouvelle-Calédonie', 'ZN-02': 'Nouvelle-Calédonie',
+    'ZP-01': 'Polynésie française', 'ZP-02': 'Polynésie française',
+    'ZW-01': 'Wallis-et-Futuna',
+}  # total: 17
+
+OVERSEAS_ATTENDUS = {
+    1958: {
+        # Algérie et Sahara (71 sièges)
+        **{f'ALG-{i:02d}': 'Algérie' for i in range(1, 68)},
+        **{f'SAH-0{i}': 'Sahara (dép. français)' for i in range(1, 5)},
+        # DOM (10 sièges, comme 1962)
+        'ZA-01': 'Guadeloupe', 'ZA-02': 'Guadeloupe', 'ZA-03': 'Guadeloupe',
+        'ZB-01': 'Martinique', 'ZB-02': 'Martinique', 'ZB-03': 'Martinique',
+        'ZC-01': 'Guyane',
+        'ZD-01': 'La Réunion', 'ZD-02': 'La Réunion', 'ZD-03': 'La Réunion',
+        # TOM (30 sièges) — territoires qui participaient encore avant les
+        # indépendances de 1960. Identifiants synthétiques, données absentes.
+        'ZS-01': 'Saint-Pierre-et-Miquelon',
+        'ZK-01': 'Comores', 'ZK-02': 'Comores',
+        'ZN-01': 'Nouvelle-Calédonie', 'ZN-02': 'Nouvelle-Calédonie',
+        'ZP-01': 'Polynésie française', 'ZP-02': 'Polynésie française',
+        # Anciens territoires (AOF, AEF, Madagascar, Togo, Djibouti…)
+        # Identifiants synthétiques ; composition exacte difficile à reconstituer
+        **{f'TOM-{i:02d}': 'Anciens territoires et États associés (1958)' for i in range(1, 24)},
+    },
+    1962: _DOM_1962_1973,
+    1967: _DOM_1962_1973,
+    1968: _DOM_1962_1973,
+    1973: _DOM_1962_1973,
+    1978: _DOM_1978_1981,
+    1981: _DOM_1978_1981,
+    1988: {
+        'ZW-01': 'Wallis-et-Futuna',
+    },
+    1993: {
+        'ZM-01': 'Mayotte',
+        'ZN-01': 'Nouvelle-Calédonie', 'ZN-02': 'Nouvelle-Calédonie',
+        'ZP-01': 'Polynésie française', 'ZP-02': 'Polynésie française',
+        'ZS-01': 'Saint-Pierre-et-Miquelon',
+        'ZW-01': 'Wallis-et-Futuna',
+    },
+}
+
+
+def build_placeholder_rows(annee: int, existing_circos: set) -> pd.DataFrame:
+    """
+    Construit des lignes vides (toutes colonnes NULL) pour les circonscriptions
+    attendues mais absentes des données sources.
+    """
+    attendus = OVERSEAS_ATTENDUS.get(annee, {})
+    target_cols = [
+        'annee', 'id_circo', 'departement',
+        'nom_candidat', 'etiquette', 'nuance',
+        'voix_t1', 'qualifie_t2', 'maintenu_t2', 'voix_t2', 'elu',
+        'inscrits_t1', 'inscrits_t2', 'votants_t1', 'votants_t2',
+        'blancs_t1', 'blancs_t2', 'nuls_t1', 'nuls_t2',
+        'exprimes_t1', 'exprimes_t2',
+    ]
+    rows = []
+    for circo_id, dept in attendus.items():
+        if circo_id not in existing_circos:
+            row = {col: None for col in target_cols}
+            row['annee'] = annee
+            row['id_circo'] = circo_id
+            row['departement'] = dept
+            rows.append(row)
+    if not rows:
+        return pd.DataFrame(columns=target_cols)
+    return pd.DataFrame(rows, columns=target_cols)
+
+
 # ─── Pipeline principal ───────────────────────────────────────────────────────
 
 def run_pipeline():
@@ -1129,9 +1246,15 @@ def run_pipeline():
 
             df_final = build_resultats_table(annee, df_parsed)
 
+            # Ajouter placeholders pour les circos manquantes (outre-mer, etc.)
+            placeholders = build_placeholder_rows(annee, set(df_final['id_circo'].unique()))
+            if not placeholders.empty:
+                df_final = pd.concat([df_final, placeholders], ignore_index=True)
+
             n_circos = df_final['id_circo'].nunique() if not df_final.empty else 0
             n_rows = len(df_final)
-            print(f"  OK: {n_rows} lignes, {n_circos} circos")
+            target = SIEGES_PAR_ANNEE.get(annee)
+            print(f"  OK: {n_rows} lignes, {n_circos} circos (cible={target})")
             coverage[annee] = {'status': 'ok', 'rows': n_rows, 'circos': n_circos, 'source': 'CDSP'}
 
             if not df_final.empty:
@@ -1165,9 +1288,15 @@ def run_pipeline():
             df_parsed = parse_xls_ministere_2002_2012(path, annee)
             df_final = build_resultats_table(annee, df_parsed)
 
+            # Ajouter placeholders pour les circos manquantes (outre-mer, etc.)
+            placeholders = build_placeholder_rows(annee, set(df_final['id_circo'].unique()))
+            if not placeholders.empty:
+                df_final = pd.concat([df_final, placeholders], ignore_index=True)
+
             n_circos = df_final['id_circo'].nunique() if not df_final.empty else 0
             n_rows = len(df_final)
-            print(f"  OK: {n_rows} lignes, {n_circos} circos")
+            target = SIEGES_PAR_ANNEE.get(annee)
+            print(f"  OK: {n_rows} lignes, {n_circos} circos (cible={target})")
             coverage[annee] = {'status': 'ok', 'rows': n_rows, 'circos': n_circos, 'source': 'Ministère'}
 
             if not df_final.empty:
@@ -1207,9 +1336,15 @@ def run_pipeline():
                 df_parsed = parse_xlsx_2024(df_t1_raw, df_t2_raw, annee)
             df_final = build_resultats_table(annee, df_parsed)
 
+            # Ajouter placeholders pour les circos manquantes (outre-mer, etc.)
+            placeholders = build_placeholder_rows(annee, set(df_final['id_circo'].unique()))
+            if not placeholders.empty:
+                df_final = pd.concat([df_final, placeholders], ignore_index=True)
+
             n_circos = df_final['id_circo'].nunique() if not df_final.empty else 0
             n_rows = len(df_final)
-            print(f"  OK: {n_rows} lignes, {n_circos} circos")
+            target = SIEGES_PAR_ANNEE.get(annee)
+            print(f"  OK: {n_rows} lignes, {n_circos} circos (cible={target})")
             coverage[annee] = {'status': 'ok', 'rows': n_rows, 'circos': n_circos, 'source': 'Ministère'}
 
             if not df_final.empty:

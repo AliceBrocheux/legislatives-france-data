@@ -53,15 +53,15 @@ Base SQLite + exports CSV/Parquet des résultats par candidat pour toutes les é
 
 | Année | Lignes | Circos | Source | Format données |
 |-------|--------|--------|--------|----------------|
-| 1958 | 2 679 | 465 | CDSP | Agrégé par parti |
-| 1962 | 2 140 | 465 | CDSP | Agrégé par parti |
-| 1967 | 2 147 | 470 | CDSP | Agrégé par parti |
-| 1968 | 2 928 | 470 | CDSP | Agrégé par parti |
-| 1973 | 2 838 | 473 | CDSP | Agrégé par parti |
-| 1978 | 3 350 | 474 | CDSP | Agrégé par parti |
-| 1981 | 2 329 | 474 | CDSP | Agrégé par parti |
-| 1988 | 2 843 | 576 | CDSP | Par candidat |
-| 1993 | 5 220 | 570 | Ministère | Par candidat |
+| 1958 | 2 790 | 576 | CDSP | Agrégé par parti |
+| 1962 | 2 157 | 482 | CDSP | Agrégé par parti |
+| 1967 | 2 164 | 487 | CDSP | Agrégé par parti |
+| 1968 | 2 945 | 487 | CDSP | Agrégé par parti |
+| 1973 | 2 855 | 490 | CDSP | Agrégé par parti |
+| 1978 | 3 367 | 491 | CDSP | Agrégé par parti |
+| 1981 | 2 346 | 491 | CDSP | Agrégé par parti |
+| 1988 | 2 844 | 577 | CDSP | Par candidat |
+| 1993 | 5 227 | 577 | Ministère | Par candidat |
 | 1997 | 6 360 | 577 | Ministère | Par candidat |
 | 2002 | 8 443 | 577 | Ministère | Par candidat |
 | 2007 | 7 633 | 577 | Ministère | Par candidat |
@@ -69,13 +69,15 @@ Base SQLite + exports CSV/Parquet des résultats par candidat pour toutes les é
 | 2017 | 7 877 | 577 | Ministère | Par candidat |
 | 2022 | 6 289 | 577 | Ministère | Par candidat |
 | 2024 | 4 009 | 577 | Ministère | Par candidat |
-| **TOTAL** | **73 688** | - | - | - |
+| **TOTAL** | **73 909** | - | - | - |
 
-**Note** : Pour 1958-1981, les données CDSP sont agrégées par parti politique (pas de nom individuel de candidat). La colonne `nom_candidat` contient le code nuance entre crochets (`[COM]`, `[RPR]`…). Ces années ne permettent donc pas d'analyse individuelle des candidats. Pour 1993-2024, les données sont issues directement du Ministère de l'Intérieur (data.gouv.fr). Le fichier 1993 du Ministère contient 570 circonscriptions sur 577 (7 circos absentes de la source).
+**Note** : Pour 1958-1981, les données CDSP sont agrégées par parti politique (pas de nom individuel de candidat). La colonne `nom_candidat` contient le code nuance entre crochets (`[COM]`, `[RPR]`…). Ces années ne permettent donc pas d'analyse individuelle des candidats. Pour 1993-2024, les données sont issues directement du Ministère de l'Intérieur (data.gouv.fr).
 
-**Note 1988** : La source CDSP couvre 576 circonscriptions sur 577 ; la circonscription manquante est vraisemblablement Wallis-et-Futuna (absente du fichier CDSP 1988).
+**Note 1958-1981** : Des lignes placeholder (toutes colonnes à NULL sauf `annee`, `id_circo`, `departement`) sont ajoutées pour les circonscriptions outre-mer et anciens territoires absentes de la source CDSP. Pour 1958, cela inclut les 67 circos d'Algérie, 4 du Sahara et les anciens territoires/États associés (TOM). Le nombre total de circonscriptions par année correspond exactement au nombre de sièges par législature.
 
-**Note 1988** : Données CDSP (par candidat) — pas de fichier Ministère disponible sur data.gouv.fr pour cette année.
+**Note 1988** : Données CDSP (par candidat) — pas de fichier Ministère disponible sur data.gouv.fr pour cette année. La circo manquante (Wallis-et-Futuna) est représentée par une ligne placeholder.
+
+**Note 1993** : Le fichier Ministère source contient 570 circonscriptions sur 577 ; les 7 circos manquantes (outre-mer) sont représentées par des lignes placeholder.
 
 ## Fichiers produits
 
